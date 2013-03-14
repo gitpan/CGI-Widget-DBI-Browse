@@ -4,7 +4,7 @@ use strict;
 
 use base qw/ CGI::Widget::DBI::Search::Base /;
 use vars qw/ $VERSION /;
-$CGI::Widget::DBI::Browse::VERSION = '0.14';
+$CGI::Widget::DBI::Browse::VERSION = '0.15';
 
 use DBI;
 use CGI::Widget::DBI::Search 0.26;
@@ -378,14 +378,14 @@ sub display_results {
     my $q = $self->{q};
     my $ws = $self->{ws};
 
-    die "Required configuration setting -category_columns not set."
+    die 'Required configuration setting -category_columns not set.'
       unless ref $self->{-category_columns} eq 'ARRAY';
 
     # set category filter condition
     $self->{'filter_columns'} = [ grep($q->param($_), @{ $self->{-category_columns} }) ];
     if (@{ $self->{'filter_columns'} }) {
         $ws->{-where_clause} = ($ws->{-where_clause} ? '('.$ws->{-where_clause}.') AND ' : '').join(
-            ' AND ', map {"$_ = ?"} map { $ws->sql_column_with_tbl_alias_for_alias($_) } @{ $self->{'filter_columns'} }
+            ' AND ', map {$_.' = ?'} map { $ws->sql_column_with_tbl_alias_for_alias($_) } @{ $self->{'filter_columns'} }
         );
         $ws->{-bind_params} = [ @{ $ws->{-bind_params} || [] }, map {$q->param($_)} @{ $self->{'filter_columns'} } ];
 
@@ -424,10 +424,9 @@ sub auto_skip_to_results {
     my $ws = $self->{ws};
     my $category_column = $self->is_browsing();
 
-    if ($self->{-auto_skip_to_results} && $category_column &&
-          ( !@{ $ws->{'results'} }
-            || (scalar(@{ $ws->{'results'} }) == 1 && $ws->{'results'}->[0]->{$category_column} eq '') )) {
-        # skip to results if we are browsing but we reach a category which has no members
+    if ($self->{-auto_skip_to_results} && $category_column
+          && ( !@{ $ws->{'results'} || [] } || scalar(@{ $ws->{'results'} }) == 1 )) {
+        # skip to results if we are browsing but we reach a category which has just 0 or 1 members
         $self->{ws} = $self->{old_ws};
         $self->{-skip_to_results} = $self->{'auto_skip_in_effect'} = 1;
         $self->{'added_breadcrumbs'} = 0;
@@ -506,7 +505,7 @@ sub add_breadcrumbs_to_header {
     ]);
     $self->{'category_title'} = '';
     $self->{'breadcrumbs'} = ['Top'];
-    $self->{'breadcrumb_links'} = [ $q->a({-id => 'breadcrumbNavLink', -href => '?'.$extra_vars}, 'Top') ];
+    $self->{'breadcrumb_links'} = [ '<a href="?'.$extra_vars.'" id="breadcrumbNavLink">Top</a>' ];
 
     foreach (@{ $self->{'filter_columns'} }) {
         my $breadcrumb_name = $q->param($_);
@@ -514,16 +513,14 @@ sub add_breadcrumbs_to_header {
         push(@cume_category_filters, _uri_param_pair($_, $breadcrumb_name));
         push(@{ $self->{'breadcrumbs'} }, $breadcrumb_name);
         push(@{ $self->{'breadcrumb_links'} },
-             $q->a({-id => 'breadcrumbNavLink', -href => '?'.join('&', @cume_category_filters, $extra_vars||())},
-                   $breadcrumb_name));
+             '<a href="?'.join('&', @cume_category_filters, $extra_vars||()).'" id="breadcrumbNavLink">'.$breadcrumb_name.'</a>');
     }
     $ws->{-optional_header} .= join('&nbsp;&gt;&nbsp;', @{ $self->{'breadcrumb_links'} });
 
     if ($self->is_browsing() && ! $self->{-skip_to_results}) {
-        $ws->{-optional_header} .= '&nbsp;&nbsp;&nbsp;&nbsp;'.$q->i(' --&gt; '.$q->a({
-            -id => 'skipToResultsLink',
-            -href => '?'.join('&', @cume_category_filters, '_browse_skip_to_results_=1', $extra_vars||()),
-        }, "Show all records in this category"));
+        $ws->{-optional_header} .= '&nbsp;&nbsp;&nbsp;&nbsp;<i> &rarr; <a href="?'.join(
+            '&', @cume_category_filters, '_browse_skip_to_results_=1', $extra_vars||(),
+        ).'" id="skipToResultsLink">Show all records in this category</a></i>';
     } elsif ($q->param('_browse_skip_to_results_')) {
         $self->{'category_title'} .= ' (all results)';
     } elsif (! $self->{-skip_to_results}) {
@@ -535,7 +532,7 @@ sub add_breadcrumbs_to_header {
 
 sub _uri_param_pair {
     my ($key, $val) = @_;
-    return uri_escape($key).'='.uri_escape($val||'');
+    return uri_escape($key).'='.uri_escape_utf8($val||'');
 }
 
 sub link_for_category_column {
@@ -550,10 +547,8 @@ sub link_for_category_column {
     }
     my $extra_vars = $self->{ws}->extra_vars_for_uri([ @{ $self->{'filter_columns'} }, '_browse_skip_to_results_', @exclude_params ]);
     return $col_found
-      ? $self->{q}->a({-id => 'jumpToCategoryLink',
-                       -href => '?'.join('&', (map { _uri_param_pair($_, $row->{$_}) } @cols),
-                                         $extra_vars || ())},
-                      $row->{$category_col})
+      ? '<a href="?'.join('&', (map { _uri_param_pair($_, $row->{$_}) } @cols), $extra_vars || ()).'" id="jumpToCategoryLink">'
+        .$row->{$category_col}.'</a>'
       : $row->{$category_col};
 }
 
@@ -568,11 +563,11 @@ sub _category_columndata_closure {
             ? $self->{-category_column_closures}->{$category_col}->($sd, $row)
             : $row->{$category_col};
         my $extra_vars = $sd->{s}->extra_vars_for_uri([ @{ $self->{'filter_columns'} }, '_browse_skip_to_results_' ]);
-        return $sd->{q}->a({-id => 'categoryNavLink',
-                            -href => '?'.join('&', $existing_category_filters || (),
-                                              _uri_param_pair($category_col, $row->{$category_col}),
-                                              $extra_vars || ())},
-                           $category_display_value);
+        return '<a href="?'.join(
+            '&', $existing_category_filters || (),
+            _uri_param_pair($category_col, $row->{$category_col}),
+            $extra_vars || (),
+        ).'" id="categoryNavLink-'.$row->{$category_col}.'">'.$category_display_value.'</a>';
     };
 }
 
