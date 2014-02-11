@@ -864,7 +864,7 @@ sub test_display__records_with_column_using_link_for_category_column
 
     $wb->{ws}->{-columndata_closures}->{'state_or_province'} = sub {
         my ($obj, $row) = @_;
-        return $obj->{s}->{b}->link_for_category_column('state_or_province', $row, 'href_testvar2');
+        return $obj->{b}->link_for_category_column('state_or_province', $row, 'href_testvar2');
     };
     # note: for this to work correctly, all category columns must be retrieved in
     #  -sql_retrieve_columns, so we have to add 'continent' since it is not retrieved by default

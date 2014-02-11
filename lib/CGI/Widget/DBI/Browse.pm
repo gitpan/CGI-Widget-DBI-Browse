@@ -4,11 +4,11 @@ use strict;
 
 use base qw/ CGI::Widget::DBI::Search::Base /;
 use vars qw/ $VERSION /;
-$CGI::Widget::DBI::Browse::VERSION = '0.15';
+$CGI::Widget::DBI::Browse::VERSION = '0.16';
 
 use DBI;
-use CGI::Widget::DBI::Search 0.26;
-use URI::Escape;
+use CGI::Widget::DBI::Search 0.30;
+use URI::Escape qw/uri_escape uri_escape_utf8/;
 use Scalar::Util qw/blessed/;
 
 #use constant DEFAULT_CACHE_EXPIRATION => '30 days'; # SQL interval format
@@ -115,7 +115,9 @@ Creates and initializes a new CGI::Widget::DBI::Browse object.
                            while in category browsing mode
   -auto_skip_to_results => If set, skips directly to results if in category browsing mode
                            but there are no category members at the current level, or if
-                           there is exactly one category member with value '' (empty string)
+                           there is exactly one category member with value '' (empty string).
+                           Note: this will have no effect if the search widget ('ws' object)
+                           is not set to -show_total_numresults.
   -post_auto_skip_callback
                         => (CODE): If set along with -auto_skip_to_results, and auto-skip
                            mode is in effect, this callback routine will be called before
@@ -145,12 +147,12 @@ sub initialize {
         # search results shown in grid format by default, when using browse widget
         $self->{ws}->{-display_mode} ||= 'grid';
     }
-    $self->{ws}->{b} = $self; # provide search object a reference back to this
 }
 
 sub _break_circular_references {
     my ($self) = @_;
-    delete $self->{ws}->{b};
+    delete $self->{old_ws}->{display}->{b};
+    delete $self->{ws}->{display}->{b};
 }
 
 =head1 METHODS
@@ -365,7 +367,7 @@ $row.  This is typically used as a callback from a column's -columndata_closures
 
   $wb->{ws}->{-columndata_closures}->{'state_or_province'} = sub {
       my ($obj, $row) = @_;
-      return $obj->{s}->{b}->link_for_category_column('state_or_province', $row);
+      return $obj->{b}->link_for_category_column('state_or_province', $row);
   };
 
 For it to work as expected, all columns listed in -category_columns must also be in the select
@@ -387,7 +389,7 @@ sub display_results {
         $ws->{-where_clause} = ($ws->{-where_clause} ? '('.$ws->{-where_clause}.') AND ' : '').join(
             ' AND ', map {$_.' = ?'} map { $ws->sql_column_with_tbl_alias_for_alias($_) } @{ $self->{'filter_columns'} }
         );
-        $ws->{-bind_params} = [ @{ $ws->{-bind_params} || [] }, map {$q->param($_)} @{ $self->{'filter_columns'} } ];
+        $ws->{-bind_params} = [ @{ $ws->{-bind_params} || [] }, map { $q->param($_) } @{ $self->{'filter_columns'} } ];
 
         map {
             $ws->{-href_extra_vars}->{$_} = undef;
@@ -408,8 +410,15 @@ sub display_results {
 
     $self->build_results();
 
-    my $html = $self->{ws}->display_results();
-    $self->_break_circular_references();
+    my $html;
+    eval {
+        if ($self->{ws}->init_display_class()) {
+            $self->{ws}->{display}->{b} = $self; # circular ref, must break with _break_circular_references()
+            $html = $self->{ws}->{display}->display();
+        }
+    };
+    $self->_break_circular_references(); # must always break ref to avoid memory leak, even if error occurred
+    if ($@) { die $@; }
     return $html;
 }
 
@@ -424,8 +433,7 @@ sub auto_skip_to_results {
     my $ws = $self->{ws};
     my $category_column = $self->is_browsing();
 
-    if ($self->{-auto_skip_to_results} && $category_column
-          && ( !@{ $ws->{'results'} || [] } || scalar(@{ $ws->{'results'} }) == 1 )) {
+    if ($self->{-auto_skip_to_results} && $category_column && $ws->{-show_total_numresults} && $ws->{'numresults'} <= 1) {
         # skip to results if we are browsing but we reach a category which has just 0 or 1 members
         $self->{ws} = $self->{old_ws};
         $self->{-skip_to_results} = $self->{'auto_skip_in_effect'} = 1;
@@ -508,7 +516,7 @@ sub add_breadcrumbs_to_header {
     $self->{'breadcrumb_links'} = [ '<a href="?'.$extra_vars.'" id="breadcrumbNavLink">Top</a>' ];
 
     foreach (@{ $self->{'filter_columns'} }) {
-        my $breadcrumb_name = $q->param($_);
+        my $breadcrumb_name = $self->decode_utf8($q->param($_));
         $self->{'category_title'} = join(' > ', $self->{'category_title'} || (), $breadcrumb_name || ());
         push(@cume_category_filters, _uri_param_pair($_, $breadcrumb_name));
         push(@{ $self->{'breadcrumbs'} }, $breadcrumb_name);
@@ -555,19 +563,20 @@ sub link_for_category_column {
 sub _category_columndata_closure {
     my ($self, $category_col) = @_;
     my $existing_category_filters =
-      join('&', map { _uri_param_pair($_, $self->{q}->param($_)) } @{ $self->{'filter_columns'} });
+      join('&', map { _uri_param_pair($_, $self->decode_utf8($self->{q}->param($_))) } @{ $self->{'filter_columns'} });
     return sub {
         my ($sd, $row) = @_;
+        my $category_decoded = $self->decode_utf8($row->{$category_col});
         my $category_display_value =
           ref $self->{-category_column_closures}->{$category_col} eq 'CODE'
             ? $self->{-category_column_closures}->{$category_col}->($sd, $row)
-            : $row->{$category_col};
-        my $extra_vars = $sd->{s}->extra_vars_for_uri([ @{ $self->{'filter_columns'} }, '_browse_skip_to_results_' ]);
+            : $category_decoded;
+        my $extra_vars = $sd->extra_vars_for_uri([ @{ $self->{'filter_columns'} }, '_browse_skip_to_results_' ]);
         return '<a href="?'.join(
             '&', $existing_category_filters || (),
-            _uri_param_pair($category_col, $row->{$category_col}),
+            _uri_param_pair($category_col, $category_decoded),
             $extra_vars || (),
-        ).'" id="categoryNavLink-'.$row->{$category_col}.'">'.$category_display_value.'</a>';
+        ).'" id="categoryNavLink-'.CGI::escapeHTML($category_decoded).'">'.$category_display_value.'</a>'; # TODO: HTML::Escape is faster than CGI
     };
 }
 
@@ -583,7 +592,7 @@ Adi Fairbank <adi@adiraj.org>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2008-2010  Adi Fairbank
+Copyright (C) 2008-2013  Adi Fairbank
 
 =head1 COPYLEFT (LICENSE)
 

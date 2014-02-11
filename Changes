@@ -8,6 +8,18 @@ all changes without author attribution are by Adi Fairbank
 
 =over 3
 
+=item 0.16 - Feb 11, 2014
+
+add utf8 escaping to support browsing datasets with non-english-language characters
+
+add exception handling to prevent circular reference memory leak if an error occurs in display of results
+
+update for refactoring in CGI::Widget::DBI::Search version 0.30
+
+bugfix: auto-skip to results code was breaking the case of a single browse result on the final page of category choices
+
+HTML escape the id of the <a/> tag of each category browse choice
+
 =item 0.15 - Mar 14, 2013
 
 minor performance improvement by eliminating unnecessary calls to HTML-generation methods
