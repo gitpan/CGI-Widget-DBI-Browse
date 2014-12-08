@@ -4,10 +4,10 @@ use strict;
 
 use base qw/ CGI::Widget::DBI::Search::Base /;
 use vars qw/ $VERSION /;
-$CGI::Widget::DBI::Browse::VERSION = '0.16';
+$CGI::Widget::DBI::Browse::VERSION = '0.17';
 
 use DBI;
-use CGI::Widget::DBI::Search 0.30;
+use CGI::Widget::DBI::Search 0.31;
 use URI::Escape qw/uri_escape uri_escape_utf8/;
 use Scalar::Util qw/blessed/;
 
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS browse_widget_category_cache (
   last_modified      TIMESTAMP,
   UNIQUE INDEX unq_all (category_column, category_value, child_value),
   INDEX idx_category_value (category_column, category_value)
-) TYPE = MyISAM
+) ENGINE = MyISAM
 END_SQL
 }
 
@@ -381,7 +381,7 @@ sub display_results {
     my $ws = $self->{ws};
 
     die 'Required configuration setting -category_columns not set.'
-      unless ref $self->{-category_columns} eq 'ARRAY';
+      if ref $self->{-category_columns} ne 'ARRAY';
 
     # set category filter condition
     $self->{'filter_columns'} = [ grep($q->param($_), @{ $self->{-category_columns} }) ];
@@ -437,7 +437,7 @@ sub auto_skip_to_results {
         # skip to results if we are browsing but we reach a category which has just 0 or 1 members
         $self->{ws} = $self->{old_ws};
         $self->{-skip_to_results} = $self->{'auto_skip_in_effect'} = 1;
-        $self->{'added_breadcrumbs'} = 0;
+        $self->{'_added_breadcrumbs'} = 0;
         $self->add_breadcrumbs_to_header();
         $self->{-post_auto_skip_callback}->($self)
           if ref $self->{-post_auto_skip_callback} eq 'CODE';
@@ -453,7 +453,7 @@ sub display_cached_category_results {
     $self->_create_category_cache_table();
 
     my $parent_category = $self->parent_category_column();
-    my $parent_value = $self->{q}->param($parent_category);
+    my $parent_value = $self->decode_utf8($self->{q}->param($parent_category));
 
     if (! $self->category_value_is_cached($parent_category, $parent_value)) {
         $self->cache_results_for_category_value($parent_category, $parent_value);
@@ -501,7 +501,7 @@ sub category_title { return shift->{'category_title'} || '' }
 
 sub add_breadcrumbs_to_header {
     my ($self) = @_;
-    return if $self->{'added_breadcrumbs'};
+    return if $self->{'_added_breadcrumbs'};
     my $q = $self->{q};
     my $ws = $self->{ws};
 
@@ -513,7 +513,7 @@ sub add_breadcrumbs_to_header {
     ]);
     $self->{'category_title'} = '';
     $self->{'breadcrumbs'} = ['Top'];
-    $self->{'breadcrumb_links'} = [ '<a href="?'.$extra_vars.'" id="breadcrumbNavLink">Top</a>' ];
+    $self->{'breadcrumb_links'} = [ '<a href="?'.$extra_vars.'" class="breadcrumbNavLink">'.$ws->translate('Top').'</a>' ];
 
     foreach (@{ $self->{'filter_columns'} }) {
         my $breadcrumb_name = $self->decode_utf8($q->param($_));
@@ -521,21 +521,25 @@ sub add_breadcrumbs_to_header {
         push(@cume_category_filters, _uri_param_pair($_, $breadcrumb_name));
         push(@{ $self->{'breadcrumbs'} }, $breadcrumb_name);
         push(@{ $self->{'breadcrumb_links'} },
-             '<a href="?'.join('&', @cume_category_filters, $extra_vars||()).'" id="breadcrumbNavLink">'.$breadcrumb_name.'</a>');
+             '<a href="?'.join('&', @cume_category_filters, $extra_vars||()).'" class="breadcrumbNavLink">'.$breadcrumb_name.'</a>');
     }
-    $ws->{-optional_header} .= join('&nbsp;&gt;&nbsp;', @{ $self->{'breadcrumb_links'} });
 
+    my $skip_to_results = '';
     if ($self->is_browsing() && ! $self->{-skip_to_results}) {
-        $ws->{-optional_header} .= '&nbsp;&nbsp;&nbsp;&nbsp;<i> &rarr; <a href="?'.join(
+        $skip_to_results = '&nbsp;&nbsp;&nbsp;&nbsp;<i> &rarr; <a href="?'.join(
             '&', @cume_category_filters, '_browse_skip_to_results_=1', $extra_vars||(),
-        ).'" id="skipToResultsLink">Show all records in this category</a></i>';
+        ).'" id="skipToResultsLink"><span>'.$ws->translate('Show all items in this category').'</span></a></i>';
     } elsif ($q->param('_browse_skip_to_results_')) {
-        $self->{'category_title'} .= ' (all results)';
+        $self->{'category_title'} .= ' ('.$ws->translate('all results').')';
     } elsif (! $self->{-skip_to_results}) {
         # -skip_to_results typically used for searching, so don't add anything to the title
-        $self->{'category_title'} .= ' (results)';
+        $self->{'category_title'} .= ' ('.$ws->translate('results').')';
     }
-    $self->{'added_breadcrumbs'} = 1;
+
+    $ws->{-optional_header} .= '<div id="breadcrumbNavDiv">'.join('&nbsp;&gt;&nbsp;', @{ $self->{'breadcrumb_links'} }).$skip_to_results.'</div>'
+      . '<div class="categoryContentDiv" id="categoryContentDiv-'.join('__', @{ $self->{'breadcrumbs'} }).'"></div>'; # available for CSS-configured content
+
+    $self->{'_added_breadcrumbs'} = 1;
 }
 
 sub _uri_param_pair {
@@ -554,10 +558,11 @@ sub link_for_category_column {
         }
     }
     my $extra_vars = $self->{ws}->extra_vars_for_uri([ @{ $self->{'filter_columns'} }, '_browse_skip_to_results_', @exclude_params ]);
+    my $category_decoded = $self->decode_utf8($row->{$category_col});
     return $col_found
-      ? '<a href="?'.join('&', (map { _uri_param_pair($_, $row->{$_}) } @cols), $extra_vars || ()).'" id="jumpToCategoryLink">'
-        .$row->{$category_col}.'</a>'
-      : $row->{$category_col};
+      ? '<a href="?'.join('&', (map { _uri_param_pair($_, $self->decode_utf8($row->{$_})) } @cols), $extra_vars || ()).'" id="jumpToCategoryLink">'
+        .$category_decoded.'</a>'
+      : $category_decoded;
 }
 
 sub _category_columndata_closure {
@@ -592,7 +597,7 @@ Adi Fairbank <adi@adiraj.org>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2008-2013  Adi Fairbank
+Copyright (C) 2008-2014  Adi Fairbank
 
 =head1 COPYLEFT (LICENSE)
 
@@ -611,6 +616,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 =head1 LAST MODIFIED
 
-Jun 26, 2010
+Dec 7, 2014
 
 =cut

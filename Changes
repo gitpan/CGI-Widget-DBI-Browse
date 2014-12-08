@@ -8,6 +8,16 @@ all changes without author attribution are by Adi Fairbank
 
 =over 3
 
+=item 0.17 - Dec 8, 2014
+
+call translate() method from Search module v0.31 on user-visible English strings, to support internationalization
+
+add a span around "Show all items in this category" so it can be replaced (via CSS) with something else
+
+add empty div so content can be added (via CSS content:) at the top of browse results for any level in category tree
+
+more unicode fixes: decode utf8 chars in link_for_category_column() and when -cache_categories enabled
+
 =item 0.16 - Feb 11, 2014
 
 add utf8 escaping to support browsing datasets with non-english-language characters

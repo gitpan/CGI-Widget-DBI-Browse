@@ -206,7 +206,7 @@ sub test_display__second_level
     $self->assert_deep_equals([qw/continent/], [$self->{wb}->ancestor_category_columns()]);
     $self->assert_display_contains(
         [ 'continent=Africa&_browse_skip_to_results_=1"[^<>]+id="skipToResultsLink',
-          "Show all records in this category" ],
+          "Show all items in this category" ],
         [ 'input type="hidden" name="continent" value="Africa' ],
         [ 'tr', 'td' ],
         [ 'continent=Africa&nation=Madagascar[^<>]+id="categoryNavLink-Madagascar".*', 'Madagascar' ],
@@ -482,13 +482,13 @@ sub test_display__paging_category_navigation
     # multi-page browse of categories: that paging links do show up, and
     # that correct total num_results shows
     $self->assert_display_contains(
-        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1', 'Next&gt' ],
+        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1', 'Next &gt' ],
         [ 'tr', 'td' ],
         [ 'continent=Africa[^<>]+id="categoryNavLink-Africa".*', 'Africa' ],
         [ 'continent=Asia[^<>]+id="categoryNavLink-Asia".*', 'Asia' ],
         [ 'continent=Australia[^<>]+id="categoryNavLink-Australia".*', 'Australia' ],
         [ 'td', 'tr' ],
-        [ 'At first page', 'search_startat=1', 'Next&gt' ],
+        [ 'At first page', 'search_startat=1', 'Next &gt' ],
     );
     $self->assert_display_does_not_contain([ 'continent=Europe[^<>]+id="categoryNavLink-Europe".*', 'Europe' ]);
     $self->assert_display_does_not_contain([ 'continent=North%20America[^<>]+id="categoryNavLink-North America".*', 'North America' ]);
@@ -503,13 +503,13 @@ sub test_display__paging_category_navigation
     $wb->{q}->param('search_startat', 1);
 
     $self->assert_display_contains(
-        [ 'search_startat=0', 'lt;Previous', '3', 'results displayed', '4 - 6', 'of', '6', 'At last page', ],
+        [ 'search_startat=0', 'lt; Previous', '3', 'results displayed', '4 - 6', 'of', '6', 'At last page', ],
         [ 'tr', 'td' ],
         [ 'continent=Europe[^<>]+id="categoryNavLink-Europe".*', 'Europe' ],
         [ 'continent=North%20America[^<>]+id="categoryNavLink-North America".*', 'North America' ],
         [ 'continent=South%20America[^<>]+id="categoryNavLink-South America".*', 'South America' ],
         [ 'td', 'tr' ],
-        [ 'search_startat=0', 'lt;Previous', 'At last page', ],
+        [ 'search_startat=0', 'lt; Previous', 'At last page', ],
     );
     $self->assert_display_does_not_contain([ 'continent=Africa[^<>]+id="categoryNavLink-Africa".*', 'Africa' ]);
     $self->assert_display_does_not_contain([ 'continent=Asia[^<>]+id="categoryNavLink-Asia".*', 'Asia' ]);
@@ -611,7 +611,7 @@ sub test_display__auto_skip_to_results_from_category_navigation
 
     $self->assert_display_contains(
         [ 'continent=Antarctica&_browse_skip_to_results_=1"[^<>]+id="skipToResultsLink',
-          "Show all records in this category" ],
+          "Show all items in this category" ],
         [ 'input type="hidden" name="continent" value="Antarctica' ],
     );
     $self->assert_display_does_not_contain(['Penguin Camp 1']);
@@ -894,11 +894,11 @@ sub test_display__paging_records
     $wb->{q}->param('nation', 'United States');
     $wb->{q}->param('state_or_province', 'New York');
     $self->assert_display_contains(
-        [ 'At first page', 'search_startat=1', 'Next&gt' ],
+        [ 'At first page', 'search_startat=1', 'Next &gt' ],
         [ 'tr', 'td' ],
         [ 'New York', 'Financial capital of the world', 20_420_000 ],
         [ 'td', 'tr' ],
-        [ 'At first page', 'search_startat=1', 'Next&gt' ],
+        [ 'At first page', 'search_startat=1', 'Next &gt' ],
     );
 
     $self->init_test_object();
@@ -910,11 +910,11 @@ sub test_display__paging_records
     $wb->{q}->param('state_or_province', 'New York');
     $wb->{q}->param('search_startat', 1);
     $self->assert_display_contains(
-        [ 'search_startat=0', 'lt;Previous', 'At last page' ],
+        [ 'search_startat=0', 'lt; Previous', 'At last page' ],
         [ 'tr', 'td' ],
         [ 'Ithaca', 'Ithaca is Gorges', 100_018 ],
         [ 'td', 'tr' ],
-        [ 'search_startat=0', 'lt;Previous', 'At last page' ],
+        [ 'search_startat=0', 'lt; Previous', 'At last page' ],
     );
 }
 
@@ -927,10 +927,10 @@ sub test_display__breadcrumb_navigation
     $wb->{q}->param('nation', 'United States');
     $wb->{q}->param('state_or_province', 'New York');
     $self->assert_display_contains(
-        [ 'href="?"[^<>]+id="breadcrumbNavLink', 'Top', 'gt' ],
-        [ 'continent=North%20America', 'id="breadcrumbNavLink', 'North America', 'gt' ],
-        [ 'continent=North%20America', 'nation=United%20States', 'id="breadcrumbNavLink', 'United States', 'gt' ],
-        [ 'continent=North%20America', 'nation=United%20States', 'state_or_province=New%20York', 'id="breadcrumbNavLink', 'New York' ],
+        [ 'href="?"[^<>]+class="breadcrumbNavLink', 'Top', 'gt' ],
+        [ 'continent=North%20America', 'class="breadcrumbNavLink', 'North America', 'gt' ],
+        [ 'continent=North%20America', 'nation=United%20States', 'class="breadcrumbNavLink', 'United States', 'gt' ],
+        [ 'continent=North%20America', 'nation=United%20States', 'state_or_province=New%20York', 'class="breadcrumbNavLink', 'New York' ],
         [ 'Sort by', 'sortby_columns_popup', 'Sort field' ],
         [ 'At first page', 'At last page' ],
         [ 'tr', 'td' ],
@@ -941,19 +941,19 @@ sub test_display__breadcrumb_navigation
     );
     $self->assert_deep_equals(['Top', 'North America', 'United States', 'New York'], $wb->{'breadcrumbs'});
     $self->assert_matches(
-        $self->word_sequence_regex_for_rows([ 'href="\?"[^<>]+id="breadcrumbNavLink', 'Top' ]),
+        $self->word_sequence_regex_for_rows([ 'href="\?"[^<>]+class="breadcrumbNavLink', 'Top' ]),
         $wb->{'breadcrumb_links'}->[0],
     );
     $self->assert_matches(
-        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'id="breadcrumbNavLink', 'North America' ]),
+        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'class="breadcrumbNavLink', 'North America' ]),
         $wb->{'breadcrumb_links'}->[1],
     );
     $self->assert_matches(
-        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'nation=United%20States', 'id="breadcrumbNavLink', 'United States' ]),
+        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'nation=United%20States', 'class="breadcrumbNavLink', 'United States' ]),
         $wb->{'breadcrumb_links'}->[2],
     );
     $self->assert_matches(
-        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'nation=United%20States', 'state_or_province=New%20York', 'id="breadcrumbNavLink', 'New York' ]),
+        $self->word_sequence_regex_for_rows([ 'continent=North%20America', 'nation=United%20States', 'state_or_province=New%20York', 'class="breadcrumbNavLink', 'New York' ]),
         $wb->{'breadcrumb_links'}->[3],
     );
 
@@ -967,9 +967,9 @@ sub test_display__breadcrumb_navigation
     $wb->{q}->param('continent', 'North America');
     $wb->{q}->param('nation', 'United States');
     $self->assert_display_contains(
-        [ 'href="?"[^<>]+id="breadcrumbNavLink', 'Top', 'gt' ],
-        [ 'continent=North%20America', 'href_testvar=foo', 'id="breadcrumbNavLink', 'North America', 'gt' ],
-        [ 'continent=North%20America', 'nation=United%20States', 'href_testvar=foo', 'id="breadcrumbNavLink', 'United States' ],
+        [ 'href="?"[^<>]+class="breadcrumbNavLink', 'Top', 'gt' ],
+        [ 'continent=North%20America', 'href_testvar=foo', 'class="breadcrumbNavLink', 'North America', 'gt' ],
+        [ 'continent=North%20America', 'nation=United%20States', 'href_testvar=foo', 'class="breadcrumbNavLink', 'United States' ],
 
         [ 'state_or_province=New%20York', 'href_testvar=foo', 'id="categoryNavLink-New York".*', 'New York, United States' ],
         [ 'state_or_province=Oregon',     'href_testvar=foo', 'id="categoryNavLink-Oregon".*',   'Oregon, United States'   ],
@@ -985,14 +985,14 @@ sub test_display__breadcrumb_navigation
     $wb->{q}->param('continent', 'North America');
     $wb->{q}->param('nation', 'United States');
     $self->assert_display_contains(
-        [ 'href="?"[^<>]+id="breadcrumbNavLink', 'Top', 'gt' ],
-        [ 'continent=North%20America', 'href_testvar=foo', 'id="breadcrumbNavLink', 'North America', 'gt' ],
-        [ 'continent=North%20America', 'nation=United%20States', 'href_testvar=foo', 'id="breadcrumbNavLink', 'United States' ],
+        [ 'href="?"[^<>]+class="breadcrumbNavLink', 'Top', 'gt' ],
+        [ 'continent=North%20America', 'href_testvar=foo', 'class="breadcrumbNavLink', 'North America', 'gt' ],
+        [ 'continent=North%20America', 'nation=United%20States', 'href_testvar=foo', 'class="breadcrumbNavLink', 'United States' ],
 
         [ 'state_or_province=New%20York', 'href_testvar2=bar', 'href_testvar=foo', 'id="categoryNavLink-New York".*', 'New York, United States' ],
         [ 'state_or_province=Oregon',     'href_testvar2=bar', 'href_testvar=foo', 'id="categoryNavLink-Oregon".*',   'Oregon, United States'   ],
     );
-    $self->assert_display_does_not_contain([ 'href_testvar2=bar[^<>]*id="breadcrumbNavLink' ]);
+    $self->assert_display_does_not_contain([ 'href_testvar2=bar[^<>]*class="breadcrumbNavLink' ]);
 }
 
 sub test_display__passing_where_clause_and_bind_params
@@ -1035,13 +1035,13 @@ sub test_display__passing_href_extra_vars
     $wb->{ws}->{-href_extra_vars} = { myVar1 => undef, myVar2 => 'constant' };
 
     $self->assert_display_contains(
-        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1&myVar2=constant', 'Next&gt' ],
+        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1&myVar2=constant', 'Next &gt' ],
         [ 'tr', 'td' ],
         [ 'continent=Africa[^<>]+id="categoryNavLink-Africa".*', 'Africa' ],
         [ 'continent=Asia[^<>]+id="categoryNavLink-Asia".*', 'Asia' ],
         [ 'continent=Australia[^<>]+id="categoryNavLink-Australia".*', 'Australia' ],
         [ 'td', 'tr' ],
-        [ 'At first page', 'search_startat=1&myVar2=constant', 'Next&gt' ],
+        [ 'At first page', 'search_startat=1&myVar2=constant', 'Next &gt' ],
     );
     $self->assert_display_does_not_contain([ 'myVar1=' ]);
 
@@ -1053,13 +1053,13 @@ sub test_display__passing_href_extra_vars
     $wb->{q}->param('myVar1', 'foo');
     # test that both myVar1 and myVar2 params are in navigation link
     $self->assert_display_contains(
-        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1', 'myVar1=foo', 'Next&gt' ],
+        [ 'At first page', '3', 'results displayed', '1 - 3', 'of', '6', 'search_startat=1', 'myVar1=foo', 'Next &gt' ],
         [ 'tr', 'td' ],
         [ 'continent=Africa[^<>]+id="categoryNavLink-Africa".*', 'Africa' ],
         [ 'continent=Asia[^<>]+id="categoryNavLink-Asia".*', 'Asia' ],
         [ 'continent=Australia[^<>]+id="categoryNavLink-Australia".*', 'Australia' ],
         [ 'td', 'tr' ],
-        [ 'At first page', 'search_startat=1', 'myVar2=constant', 'Next&gt' ],
+        [ 'At first page', 'search_startat=1', 'myVar2=constant', 'Next &gt' ],
     );
 }
 
